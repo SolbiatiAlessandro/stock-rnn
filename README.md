@@ -1,3 +1,8 @@
+### twosigma branch
+
+intergration for two sigma kaggle competition
+
+
 ### Predict stock market prices using RNN
 
 Check my blog post "Predict Stock Prices Using RNN": [Part 1](https://lilianweng.github.io/lil-log/2017/07/08/predict-stock-prices-using-RNN-part-1.html) and [Part 2](https://lilianweng.github.io/lil-log/2017/07/22/predict-stock-prices-using-RNN-part-2.html) for the tutorial associated.
