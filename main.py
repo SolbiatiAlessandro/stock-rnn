@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import pprint
 
 import tensorflow as tf
@@ -7,6 +8,7 @@ import tensorflow.contrib.slim as slim
 
 from data_model import StockDataSet
 from model_rnn import LstmRNN
+from matplotlib import pyplot as plt
 
 flags = tf.app.flags
 flags.DEFINE_integer("stock_count", 100, "Stock count [100]")
@@ -106,22 +108,44 @@ def main(_):
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
             print("[main.py] START PREDICTION STAGE")
-            dataset = StockDataSet("SP500",test_ratio=1)
-            prepared_data = dataset._prepare_data(dataset.raw_seq)
-            test_X, test_y = prepared_data[2], prepared_data[3]
-            test_feed_dict = {
-                sess.graph.get_tensor_by_name('inputs:0'): test_X,
-                sess.graph.get_tensor_by_name('targets:0'): test_y,
+            target_stock = "AAPL"
+            label = 0 # still not too clear about mapping symbol ->label
+            print("[main.[y] target stock: "+target_stock)
+            dataset_list = load_sp500(FLAGS.input_size, FLAGS.num_steps,1, target_stock, test_ratio=0.2)
+
+            # Merged test data of different stocks.
+            merged_test_X = []
+            merged_test_y = []
+            merged_test_labels = []
+
+            for label_, d_ in enumerate(dataset_list):
+                merged_test_X += list(d_.test_X)
+                merged_test_y += list(d_.test_y)
+                merged_test_labels += [[label]] * len(d_.test_X)
+
+            test_data_feed = {
                 sess.graph.get_tensor_by_name('learning_rate:0'): 0.0,
-                sess.graph.get_tensor_by_name('keep_prob:0'): 1.0
-            }
+                sess.graph.get_tensor_by_name('keep_prob:0'): 1.0,
+                sess.graph.get_tensor_by_name('inputs:0'): merged_test_X,
+                sess.graph.get_tensor_by_name('targets:0'): merged_test_y,
+                sess.graph.get_tensor_by_name('stock_labels:0'): merged_test_labels,
+        }
 
             prediction = sess.graph.get_tensor_by_name('add:0')
             loss = sess.graph.get_tensor_by_name('loss_mse_test:0')
-            test_prediction, test_loss = sess.run([prediction, loss], test_feed_dict)
+            test_prediction, test_loss = sess.run([prediction, loss], test_data_feed)
             print("[main.py] GOT PREDICTIONS OF SHAPE")
             print(test_prediction.shape)
-            pass
+
+            for i in xrange(FLAGS.input_size):
+                print("printing labels[{}]".format(i))
+                pred = np.transpose(test_prediction[-198:])[i] * 5
+                real = np.transpose(merged_test_y)[i][-198:]
+                plt.plot(pred, label='pred')
+                plt.plot(real, label='real')
+                plt.legend()
+                plt.show()
+
 
 if __name__ == '__main__':
     tf.app.run()
