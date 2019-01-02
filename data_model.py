@@ -39,6 +39,12 @@ class StockDataSet(object):
             self.stock_sym, len(self.train_X), len(self.test_y))
 
     def _prepare_data(self, seq):
+        """
+        Args:
+            seq: raw_df['Close'].tolist()
+        Returns:
+            train_X, train_y, test_X, test_y
+        """
         # split into items of input_size
         seq = [np.array(seq[i * self.input_size: (i + 1) * self.input_size])
                for i in range(len(seq) // self.input_size)]

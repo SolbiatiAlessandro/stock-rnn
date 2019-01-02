@@ -8,6 +8,15 @@ from config import MODEL_DIR
 
 
 def prediction_by_trained_graph(graph_name, max_epoch, test_X, test_y):
+    """
+    Args:
+        graph_name: (str) folder inside logs
+        max_epoch: (int) 
+        test_X, test_Y: np.array[] formatted as in
+         data_model._prepare_data(raw_df['Close'].tolist())
+    returns:
+        test_prediction, test_loss
+    """
     test_prediction = None
     test_loss = None
 

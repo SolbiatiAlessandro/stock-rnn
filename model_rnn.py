@@ -286,6 +286,10 @@ class LstmRNN(object):
         )
 
     def load(self):
+        """
+        this method is basically checking that the model
+        can be loaded correctly
+        """
         print(" [*] Reading checkpoints...")
         ckpt = tf.train.get_checkpoint_state(self.model_logs_dir)
         if ckpt and ckpt.model_checkpoint_path:
