@@ -108,8 +108,8 @@ def main(_):
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
             print("[main.py] START PREDICTION STAGE")
-            target_stock = "AAPL"
-            label = 0 # still not too clear about mapping symbol ->label
+            target_stock = "MSFT"
+            label = 3 # still not too clear about mapping symbol ->label
             print("[main.[y] target stock: "+target_stock)
             dataset_list = load_sp500(FLAGS.input_size, FLAGS.num_steps,1, target_stock, test_ratio=1)
 
@@ -164,6 +164,10 @@ def main(_):
             score1 = truediv(binary_score, len(target_data.test_X))
             print("[main] PREDICTIONS: binary score on "+target_stock)
             print(score1)
+            score_file = "./logs/stock_rnn_lstm128_step30_input10_embed3/scores/train_data"
+            print("[main] writing scores on "+score_file)
+            with open(score_file,'a') as sf:
+                sf.write(target_stock+" "+str(score1)+"\n")
 
 
 if __name__ == '__main__':
