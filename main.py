@@ -111,7 +111,7 @@ def main(_):
             target_stock = "AAPL"
             label = 0 # still not too clear about mapping symbol ->label
             print("[main.[y] target stock: "+target_stock)
-            dataset_list = load_sp500(FLAGS.input_size, FLAGS.num_steps,1, target_stock, test_ratio=0.2)
+            dataset_list = load_sp500(FLAGS.input_size, FLAGS.num_steps,1, target_stock, test_ratio=1)
 
             # Merged test data of different stocks.
             merged_test_X = []
@@ -134,17 +134,36 @@ def main(_):
             prediction = sess.graph.get_tensor_by_name('add:0')
             loss = sess.graph.get_tensor_by_name('loss_mse_test:0')
             test_prediction, test_loss = sess.run([prediction, loss], test_data_feed)
+
+            #test_prediction are normalized prices (not returns)
+
             print("[main.py] GOT PREDICTIONS OF SHAPE")
             print(test_prediction.shape)
 
-            for i in xrange(FLAGS.input_size):
-                print("printing labels[{}]".format(i))
-                pred = np.transpose(test_prediction[-198:])[i] * 5
-                real = np.transpose(merged_test_y)[i][-198:]
-                plt.plot(pred, label='pred')
-                plt.plot(real, label='real')
-                plt.legend()
-                plt.show()
+            i = 9
+            print("printing labels[{}]".format(i))
+            pred = np.transpose(test_prediction)[i] * 5
+            real = np.transpose(merged_test_y)[i]
+            plt.plot(pred, label='pred')
+            plt.plot(real, label='real')
+            plt.legend()
+            #plt.show()
+
+            binary_score = 0
+            target_data = dataset_list[0]
+            for i in range(len(target_data.test_X)):
+                last_close = target_data.test_X[i][-1][-1]
+                #  _X[i][-1][-1], first [-1] is for the last 10 days, second [-1] is for the last day of last 10 days
+                real_next10 = target_data.test_y[i][-1]
+                pred_next10 = test_prediction[i][-1]
+
+                binary = int(((pred_next10 - last_close) * (real_next10 - last_close)) >= 0)
+                # are pred and real in the same direction?
+                binary_score += binary
+            from operator import truediv
+            score1 = truediv(binary_score, len(target_data.test_X))
+            print("[main] PREDICTIONS: binary score on "+target_stock)
+            print(score1)
 
 
 if __name__ == '__main__':

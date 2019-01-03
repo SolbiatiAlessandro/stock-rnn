@@ -191,7 +191,6 @@ class LstmRNN(object):
             self.targets: merged_test_y,
             self.symbols: merged_test_labels,
         }
-        import pdb;pdb.set_trace()
 
         global_step = 0
 
