@@ -41,6 +41,7 @@ def show_all_variables():
 
 
 def load_sp500(input_size, num_steps, k=None, target_symbol=None, test_ratio=0.05):
+    """not documented, from original fork, only for training"""
     if target_symbol is not None:
         return [
             StockDataSet(
@@ -86,7 +87,6 @@ def model_predict(sess, dataset_list, target_stock, label, visualize=False):
     returns:
         test_predictions, test_loss
     """
-
     print("[main.py] START PREDICTION STAGE")
     print("[main.[y] target stock: "+target_stock)
 
@@ -106,8 +106,7 @@ def model_predict(sess, dataset_list, target_stock, label, visualize=False):
         sess.graph.get_tensor_by_name('inputs:0'): merged_test_X,
         sess.graph.get_tensor_by_name('targets:0'): merged_test_y,
         sess.graph.get_tensor_by_name('stock_labels:0'): merged_test_labels,
-}
-
+    }
     prediction = sess.graph.get_tensor_by_name('add:0')
     loss = sess.graph.get_tensor_by_name('loss_mse_test:0')
     test_prediction, test_loss = sess.run([prediction, loss], test_data_feed)
@@ -128,6 +127,38 @@ def model_predict(sess, dataset_list, target_stock, label, visualize=False):
         plt.show()
 
     return test_prediction, test_loss
+
+def binary_score(target_data, test_prediction, target_stock):
+    """
+    evaluates and store a simple binary score 
+    for model predictions
+
+    Args:
+        target_data: labels
+        test_predictions: pred values
+        target_stock: (str) for name printing
+    return:
+        binary_score: (float)
+    """
+    binary_score = 0
+    for i in range(len(target_data.test_X)):
+        last_close = target_data.test_X[i][-1][-1]
+        #  _X[i][-1][-1], first [-1] is for the last 10 days, second [-1] is for the last day of last 10 days
+        real_next10 = target_data.test_y[i][-1]
+        pred_next10 = test_prediction[i][-1]
+
+        binary = int(((pred_next10 - last_close) * (real_next10 - last_close)) >= 0)
+        # are pred and real in the same direction?
+        binary_score += binary
+    from operator import truediv
+    score1 = truediv(binary_score, len(target_data.test_X))
+    print("[main] PREDICTIONS: binary score on "+target_stock)
+    print(score1)
+    score_file = "./logs/stock_rnn_lstm128_step30_input10_embed3/scores/train_data"
+    print("[main] writing scores on "+score_file)
+    with open(score_file,'a') as sf:
+        sf.write(target_stock+" "+str(score1)+"\n")
+
 
 def main(_):
     """
@@ -177,29 +208,16 @@ def main(_):
 
             target_stock = "AAPL"
             label = 0
-            dataset_list = load_sp500(FLAGS.input_size, FLAGS.num_steps,1, target_stock, test_ratio=1)
+            dataset_list = [StockDataSet(
+                target_stock,
+                input_size=FLAGS.input_size,
+                num_steps=FLAGS.num_steps,
+                test_ratio=1)]
 
             test_prediction, test_loss = model_predict(sess, dataset_list, target_stock, label)
 
-            binary_score = 0
             target_data = dataset_list[0]
-            for i in range(len(target_data.test_X)):
-                last_close = target_data.test_X[i][-1][-1]
-                #  _X[i][-1][-1], first [-1] is for the last 10 days, second [-1] is for the last day of last 10 days
-                real_next10 = target_data.test_y[i][-1]
-                pred_next10 = test_prediction[i][-1]
-
-                binary = int(((pred_next10 - last_close) * (real_next10 - last_close)) >= 0)
-                # are pred and real in the same direction?
-                binary_score += binary
-            from operator import truediv
-            score1 = truediv(binary_score, len(target_data.test_X))
-            print("[main] PREDICTIONS: binary score on "+target_stock)
-            print(score1)
-            score_file = "./logs/stock_rnn_lstm128_step30_input10_embed3/scores/train_data"
-            print("[main] writing scores on "+score_file)
-            with open(score_file,'a') as sf:
-                sf.write(target_stock+" "+str(score1)+"\n")
+            binary_score(target_data, test_prediction, target_stock)
 
 
 if __name__ == '__main__':
