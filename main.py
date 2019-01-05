@@ -72,20 +72,31 @@ def load_sp500(input_size, num_steps, k=None, target_symbol=None, test_ratio=0.0
         StockDataSet(row['symbol'],
                      input_size=input_size,
                      num_steps=num_steps,
-                     test_ratio=0.05)
+                     test_ratio=0.05,
+                     read_from_twosigma=False)
         for _, row in info.iterrows()]
 
 def model_predict(sess, dataset_list, target_stock, label, visualize=False):
     """
     method for predicting new data with rnn model
     Args:
-        sess: tensorflow session
-        dataset_list: returned by load_sp500 (specify)
+        sess: (tensorflow.python.client.session.Session)
+        dataset_list: [(data_model.StockDataSet)] *NOTE
         target_stock: (str)
         label: (int)
         visualize: (bool) plots predictions
     returns:
         test_predictions, test_loss
+
+    NOTE:
+        Arg dataset_list is generated as follows
+    dataset_list = [StockDataSet(
+        FILE_NAME,
+        input_size=FLAGS.input_size,
+        num_steps=FLAGS.num_steps,
+        test_ratio=1)]
+
+    for more info: help(data_model.StockDataSet.__init__)
     """
     print("[main.py] START PREDICTION STAGE")
     print("[main.[y] target stock: "+target_stock)
@@ -134,8 +145,9 @@ def binary_score(target_data, test_prediction, target_stock):
     for model predictions
 
     Args:
-        target_data: labels
-        test_predictions: pred values
+        target_data: (data_model.StockDataSet)
+        test_predictions: (numpy.ndarray)
+           shape (len_prediction, FLAGS.input_size)
         target_stock: (str) for name printing
     return:
         binary_score: (float)
@@ -161,17 +173,13 @@ def binary_score(target_data, test_prediction, target_stock):
 
 
 def main(_):
-    """
-    --
-    1) train model
+    """procedure with two user cases
 
+    1) train model:
     python main.py --stock_count=400 --embed_size=3 --input_size=10 --max_epoch=50
 
-
-    --
     2) if already trained predict for hardcoded target_stock
-     and computes binary metric
-
+     and computes binary metric:
     python main.py --stock_count=400 --embed_size=3 --input_size=10 --max_epoch=50 --train=False
     """
     pp.pprint(flags.FLAGS.__flags)
@@ -197,12 +205,14 @@ def main(_):
             FLAGS.input_size,
             FLAGS.num_steps,
             k=FLAGS.stock_count,
-            target_symbol=FLAGS.stock_symbol,
+            target_symbol=FLAGS.stock_symbol
         )
 
         if FLAGS.train:
+            # TRIGGER TRAIN ROUTINE
             rnn_model.train(stock_data_list, FLAGS)
         else:
+            # TRIGGER PREDICTION ROUTINE
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
 
