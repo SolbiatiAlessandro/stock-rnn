@@ -43,7 +43,8 @@ class StockDataSet(object):
         # Read csv file
         if not read_from_twosigma:
             DATA_FOLDER = "data"
-            raw_df = pd.read_csv(os.path.join(DATA_FOLDER, "%s.csv" % stock_sym))
+            test_df = pd.read_csv(os.path.join(DATA_FOLDER, "%s.csv" % stock_sym))
+            tail_df = None
         else:
 
             # NOTE: requirements for data size
@@ -81,6 +82,7 @@ class StockDataSet(object):
             tail_df = pd.DataFrame({'Close':tail_df}).reset_index(drop=True)
 
         if test_df.empty: raise ValueError(": can't find {} in two-sigma dataset".format(self.stock_sym))
+        # tail_df is used only for two_sigma predictions
 
 
         try: assert 'Close' in list(test_df.columns)
@@ -88,13 +90,14 @@ class StockDataSet(object):
 
         # Merge into one sequence
         if close_price_only:
-            self.tail_seq = tail_df['Close'].tolist()
+            if test_ratio == 1 : self.tail_seq = tail_df['Close'].tolist()
             self.test_seq = test_df['Close'].tolist()
         else:
             raise NotImplemented(" implemented only close prices")
 
-        self.tail_seq = np.array(self.tail_seq)
+        if test_ratio == 1 : self.tail_seq = np.array(self.tail_seq)
         self.test_seq = np.array(self.test_seq)
+
         if read_from_twosigma:
             self.test_X, self.test_y = self._prepare_prediction_data(self.test_seq, self.tail_seq)
         else:
@@ -132,9 +135,10 @@ class StockDataSet(object):
 
         if self.normalized:
             seq = [seq[0] / seq[0][0] - 1.0] + [
-                curr / seq[i + 1][-1] - 1.0 for i, curr in enumerate(seq[1:])]
-        # TODO: issue? was this bug also in original branch? should check 
-        # seq[i + 1] was seq[i] and element were normalized on 8th and not on 9th
+                curr / concat_seq[i] - 1.0 for i, curr in enumerate(seq[1:])]
+        # sequence starting in t is normalized on elemnt in t-1
+        assert seq[0][1] == seq[1][0]
+        assert seq[1][1] != seq[2][0]
 
         range_val = len(seq) - self.num_steps 
         # reason and condition on tail_seq is that
@@ -194,6 +198,7 @@ class StockDataSet(object):
               for i in range(len(seq) // self.input_size)]
 
 
+        # items are normalized to the last elems of last seq
         if self.normalized:
             seq = [seq[0] / seq[0][0] - 1.0] + [
                 curr / seq[i][-1] - 1.0 for i, curr in enumerate(seq[1:])]

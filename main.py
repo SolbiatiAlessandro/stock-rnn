@@ -152,6 +152,7 @@ def binary_score(target_data, test_prediction, target_stock):
     return:
         binary_score: (float)
     """
+    import pdb;pdb.set_trace()
     binary_score = 0
     for i in range(len(target_data.test_X)):
         last_close = target_data.test_X[i][-1][-1]
