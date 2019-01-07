@@ -266,8 +266,8 @@ def main(_):
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
 
-            target_stock = "AAPL.O"
-            label = mapping[target_stock]
+            target_stock = 'MSFT.O'
+            label = mapping[target_stock] 
             dataset_list = [StockDataSet(
                 target_stock,
                 input_size=FLAGS.input_size,
