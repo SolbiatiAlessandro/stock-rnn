@@ -201,14 +201,15 @@ def main(_):
 
         show_all_variables()
 
-        stock_data_list = load_sp500(
-            FLAGS.input_size,
-            FLAGS.num_steps,
-            k=FLAGS.stock_count,
-            target_symbol=FLAGS.stock_symbol
-        )
-
         if FLAGS.train:
+            # stock_data_list for training
+            stock_data_list = load_sp500(
+                FLAGS.input_size,
+                FLAGS.num_steps,
+                k=FLAGS.stock_count,
+                target_symbol=FLAGS.stock_symbol
+            )
+
             # TRIGGER TRAIN ROUTINE
             rnn_model.train(stock_data_list, FLAGS)
         else:

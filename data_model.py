@@ -39,6 +39,7 @@ class StockDataSet(object):
         self.test_ratio = test_ratio
         self.close_price_only = close_price_only
         self.normalized = normalized
+        self.read_from_two_sigma = read_from_twosigma
         # Read csv file
         if not read_from_twosigma:
             DATA_FOLDER = "data"
@@ -69,18 +70,25 @@ class StockDataSet(object):
         else:
             self.raw_seq = [price for tup in raw_df[['Open', 'Close']].values for price in tup]
 
-        if read_from_twosigma: import pdb;pdb.set_trace()
-        try:
-            self.raw_seq = np.array(self.raw_seq)
-            self.train_X, self.train_y, self.test_X, self.test_y = self._prepare_data(self.raw_seq)
-        except:import pdb;pdb.set_trace() 
+        self.raw_seq = np.array(self.raw_seq)
+        if read_from_twosigma:
+            try:
+                self.train_X, self.train_y, self.test_X, self.test_y = self._prepare_prediction_data(self.raw_seq)
+            except Exception as e:
+                print("[_prepare_data_prediction] Exception: "+str(e.message))
+                import pdb;pdb.set_trace() 
+        else:
+            try:
+                self.train_X, self.train_y, self.test_X, self.test_y = self._prepare_data(self.raw_seq)
+            except Exception as e:
+                print("[_prepare_data] Exception: "+str(e.message))
+                import pdb;pdb.set_trace() 
 
     def info(self):
         return "StockDataSet [%s] train: %d test: %d" % (
             self.stock_sym, len(self.train_X), len(self.test_y))
 
-    def _prepare_data(self, seq): #TODO: reformat _prepare_data_prediction
-        # and keep this with originial code
+    def _prepare_prediction_data(self, seq): 
         """
         Args:
             seq: raw_df['Close'].tolist()
@@ -93,21 +101,16 @@ class StockDataSet(object):
         # in order to have non overlapping X. Of course since I need day to day
         # predictions this is not ok.
         #
-        # seq = [np.array(seq[i * self.input_size: (i + 1) * self.input_size])
-        #       for i in range(len(seq) // self.input_size)]
-
-        if len(seq) == 54:import pdb;pdb.set_trace() 
         seq = [np.array(seq[i * self.input_size: (i + 1) * self.input_size]) for i in range(len(seq))]
 
         if self.normalized:
             seq = [seq[0] / seq[0][0] - 1.0] + [
-                curr / seq[i][-1] - 1.0 for i, curr in enumerate(seq[1:])]
+                curr / seq[i][-1] - 1.0 for i, curr in enumerate(seq[1:]) if len(curr) > 0]
 
         # split into groups of num_steps
 
         # so my sequences are too short,the original code breaks
         # because X is empty, this is the original code:
-        # X = np.array([seq[i: i + self.num_steps] for i in range(len(seq) - self.num_steps)])
 
         # the original code would split num_steps, where every step is long size_input
         # my size input is fixed to 10, so I would put self.num_step to 1 or 2?
@@ -115,10 +118,36 @@ class StockDataSet(object):
 
         # I will modify and raise a warning, for now I use dull values
 
+        import pdb;pdb.set_trace() 
         range_val = len(seq) - self.num_steps 
-        if range_val == 0:
+        if range_val <= 0:
             print("[_prepare_data] WARNING: using dull values for part of training")
             range_val = len(seq)
+
+        X = np.array([seq[i: i + self.num_steps] for i in range(range_val)])
+        y = np.array([seq[i + self.num_steps] for i in range(range_val)])
+
+        import pdb;pdb.set_trace() 
+        train_size = int(len(X) * (1.0 - self.test_ratio))
+        train_X, test_X = X[:train_size], X[train_size:]
+        train_y, test_y = y[:train_size], y[train_size:]
+        return train_X, train_y, test_X, test_y
+
+    def _prepare_data(self, seq): #TODO: reformat _prepare_data_prediction
+        # and keep this with originial code
+        """
+        Args:
+            seq: raw_df['Close'].tolist()
+        Returns:
+            train_X, train_y, test_X, test_y
+        """
+        seq = [np.array(seq[i * self.input_size: (i + 1) * self.input_size])
+              for i in range(len(seq) // self.input_size)]
+
+
+        if self.normalized:
+            seq = [seq[0] / seq[0][0] - 1.0] + [
+                curr / seq[i][-1] - 1.0 for i, curr in enumerate(seq[1:])]
 
         X = np.array([seq[i: i + self.num_steps] for i in range(len(seq) - self.num_steps)])
         y = np.array([seq[i + self.num_steps] for i in range(len(seq) - self.num_steps)])
