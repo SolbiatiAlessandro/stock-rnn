@@ -228,6 +228,12 @@ def main(_):
 
             print("[main.py] data processing done TIME:",str(time() - start_time))
 
+            mapping = {}
+            for label, stockDataSet in enumerate(stock_data_list):
+                mapping[stockDataSet.stock_sym] = label
+            import pickle as pk
+            pk.dump(mapping, open("temp_mapping","wb"))
+
             print("[main.py] initialize rnn_model with stock_count: "+str(len(stock_data_list)))
             FLAGS.stock_count = len(stock_data_list)
             rnn_model = LstmRNN(
@@ -243,12 +249,25 @@ def main(_):
             rnn_model.train(stock_data_list, FLAGS)
 
         else:
+            import pickle as pk 
+            mapping = pk.load(open("temp_mapping","rb"))
+            FLAGS.stock_count = len(mapping)
+            rnn_model = LstmRNN(
+                sess,
+                stock_count =FLAGS.stock_count,
+                lstm_size=FLAGS.lstm_size,
+                num_layers=FLAGS.num_layers,
+                num_steps=FLAGS.num_steps,
+                input_size=FLAGS.input_size,
+                embed_size=FLAGS.embed_size,
+            )
+
             # TRIGGER PREDICTION ROUTINE
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
 
             target_stock = "AAPL.O"
-            label = 8
+            label = mapping[target_stock]
             dataset_list = [StockDataSet(
                 target_stock,
                 input_size=FLAGS.input_size,

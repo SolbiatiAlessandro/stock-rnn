@@ -191,7 +191,6 @@ class LstmRNN(object):
             self.targets: merged_test_y,
             self.symbols: merged_test_labels,
         }
-        import pdb;pdb.set_trace()
         global_step = 0
 
         num_batches = sum(len(d_.train_X) for d_ in dataset_list) // config.batch_size
@@ -206,7 +205,6 @@ class LstmRNN(object):
                 i for i, sym_label in enumerate(merged_test_labels)
                 if sym_label[0] == l])
             sample_indices[sym] = target_indices
-        import pdb;pdb.set_trace() 
         print sample_indices
 
         print "Start training for stocks:", [d.stock_sym for d in dataset_list]
