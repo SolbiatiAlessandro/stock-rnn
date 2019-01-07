@@ -189,85 +189,35 @@ def main(_):
     run_config.gpu_options.allow_growth = True
 
     with tf.Session(config=run_config) as sess:
+        rnn_model = LstmRNN(
+            sess,
+            FLAGS.stock_count,
+            lstm_size=FLAGS.lstm_size,
+            num_layers=FLAGS.num_layers,
+            num_steps=FLAGS.num_steps,
+            input_size=FLAGS.input_size,
+            embed_size=FLAGS.embed_size,
+        )
 
         show_all_variables()
 
+        stock_data_list = load_sp500(
+            FLAGS.input_size,
+            FLAGS.num_steps,
+            k=FLAGS.stock_count,
+            target_symbol=FLAGS.stock_symbol
+        )
+
         if FLAGS.train:
             # TRIGGER TRAIN ROUTINE
-            # stock_data_list for training
-
-            # loads train data from two_sigma
-            DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
-            mixed_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv"))
-            # mixed_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df.csv"))
-            train_dataset=mixed_test_df
-
-
-            from time import time, ctime
-            start_time = time()
-            print("[main.py] start training data processing from two-sigma dataset, "+ctime())
-            stock_data_list = []
-            assetCodes = mixed_test_df['assetCode'].unique().tolist()
-            for process, assetCode in enumerate(assetCodes):
-                if process % 500 == 0: print("process = "+str(process))
-
-                asset_train_dataset = train_dataset[train_dataset['assetCode'] == assetCode]
-                asset_train_dataset = pd.DataFrame({'Close':asset_train_dataset['close']}).reset_index(drop=True)
-
-                # if asset has too few datapoint don't insert or will break data process
-                if  FLAGS.num_steps * FLAGS.input_size + 1 < len(asset_train_dataset):
-                    stock_data_list.append(
-                        StockDataSet(assetCode,
-                                     input_size=FLAGS.input_size,
-                                     num_steps=FLAGS.num_steps,
-                                     test_ratio=0.05,
-                                     read_from_twosigma=True,
-                                     train_dataset = asset_train_dataset
-                                     )
-                        )
-
-            print("[main.py] data processing done TIME:",str(time() - start_time))
-
-            mapping = {}
-            for label, stockDataSet in enumerate(stock_data_list):
-                mapping[stockDataSet.stock_sym] = label
-            import pickle as pk
-            pk.dump(mapping, open("temp_mapping","wb"))
-
-            print("[main.py] initialize rnn_model with stock_count: "+str(len(stock_data_list)))
-            FLAGS.stock_count = len(stock_data_list)
-            rnn_model = LstmRNN(
-                sess,
-                stock_count =FLAGS.stock_count,
-                lstm_size=FLAGS.lstm_size,
-                num_layers=FLAGS.num_layers,
-                num_steps=FLAGS.num_steps,
-                input_size=FLAGS.input_size,
-                embed_size=FLAGS.embed_size,
-            )
-
             rnn_model.train(stock_data_list, FLAGS)
-
         else:
-            import pickle as pk 
-            mapping = pk.load(open("temp_mapping","rb"))
-            FLAGS.stock_count = len(mapping)
-            rnn_model = LstmRNN(
-                sess,
-                stock_count =FLAGS.stock_count,
-                lstm_size=FLAGS.lstm_size,
-                num_layers=FLAGS.num_layers,
-                num_steps=FLAGS.num_steps,
-                input_size=FLAGS.input_size,
-                embed_size=FLAGS.embed_size,
-            )
-
             # TRIGGER PREDICTION ROUTINE
             if not rnn_model.load()[0]:
                 raise Exception("[!] Train a model first, then run test mode")
 
-            target_stock = 'MSFT.O'
-            label = mapping[target_stock] 
+            target_stock = "AAPL"
+            label = 0
             dataset_list = [StockDataSet(
                 target_stock,
                 input_size=FLAGS.input_size,
