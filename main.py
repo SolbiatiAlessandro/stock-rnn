@@ -202,6 +202,7 @@ def main(_):
         show_all_variables()
 
         if FLAGS.train:
+            # TRIGGER TRAIN ROUTINE
             # stock_data_list for training
             stock_data_list = load_sp500(
                 FLAGS.input_size,
@@ -210,7 +211,6 @@ def main(_):
                 target_symbol=FLAGS.stock_symbol
             )
 
-            # TRIGGER TRAIN ROUTINE
             rnn_model.train(stock_data_list, FLAGS)
         else:
             # TRIGGER PREDICTION ROUTINE
