@@ -36,6 +36,23 @@ def binary_score(target_data, test_prediction, target_stock):
     with open(score_file,'a') as sf:
         sf.write(target_stock+" "+str(score1)+"\n")
 
+def evaluate_predictions(prediction_name):
+    from sigma_score import sigma_score
+    DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
+    market_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv")).drop('Unnamed: 0', axis=1)
+    target = market_test_df['returnsOpenNextMktres10']
+    time = market_test_df['time']
+    import pickle as pk
+    predictions = pk.load(open(prediction_name, "rb"))
+    predictions=pd.concat(predictions)['confidenceValue']
+    predictions.reset_index(drop=True,inplace=True)
+    target=target[-len(predictions):]
+    time=time.iloc[-len(predictions):]
+    score = sigma_score(predictions, target, time)
+    print(score)
+    import pdb;pdb.set_trace()
+    
+
 class testcase(unittest.TestCase):
 
     def setUp(self):
@@ -178,8 +195,9 @@ class testcase(unittest.TestCase):
         start_time = self.market_train_df['time'].unique()[-max(n_lag)-1]
         total_market_obs_df = [self.market_train_df[self.market_train_df['time'] > start_time]]
 
-        for (market_obs_df, news_obs_df, predictions_template_df) in days[:2]:
+        for (market_obs_df, news_obs_df, predictions_template_df) in days:
             n_days +=1
+            print("[test_predict_rolling] DAY:"+str(n_days))
             t = time.time()
             #market_obs_df['time'] = market_obs_df['time'].dt.date
 
@@ -194,14 +212,10 @@ class testcase(unittest.TestCase):
             predictions_template_df = predictions_template_df.merge(preds,how='left').drop('confidenceValue',axis=1).fillna(0).rename(columns={'confidence':'confidenceValue'})
             PREDICTIONS.append(predictions_template_df)
 
-        for i, ref in enumerate(PREDICTIONS):
-            df = pd.DataFrame({'assetCode':PREDICTIONS[i]['assetCode'],'ref':PREDICTIONS[i]['confidenceValue'],'compare':PREDICTIONS[i]['confidenceValue']})
-            try:
-                self.assertTrue(all(df.iloc[:,1] == df.iloc[:,2]))
-            except:
-                print("AssertionError: rolling predictions not correct")
-                import pdb;pdb.set_trace()
-                pass
+        import pickle as pk
+        print("[test_predict_rolling] SAVING PREDICTIONS")
+        pk.dump(PREDICTIONS, open("predictions_model_twosigma.pkl","wb"))
+
 
     @unittest.skip("do not print")
     def test_inspect(self):

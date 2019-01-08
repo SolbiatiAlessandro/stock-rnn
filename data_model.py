@@ -124,7 +124,7 @@ class StockDataSet(object):
         return "StockDataSet [%s] train: %d test: %d" % (
             self.stock_sym, len(self.train_X), len(self.test_y))
 
-    def _prepare_prediction_data(self, raw_seq, tail_seq): 
+    def _prepare_prediction_data(self, raw_seq, tail_seq, verbose=False): 
         """
         Args:
             raw_seq: numpy.ndarray(float), last arbitrary N values
@@ -207,8 +207,8 @@ class StockDataSet(object):
         # assert X[2][-1][-1] == concat_seq[prediction_start + 1]
         # assert X[2][-2][-1] == concat_seq[prediction_start - 9]
 
-        print("[_prepare_data_prediction] prepare X with shape {}".format(X.shape))
-        print("[_prepare_data_prediction] prepare y with shape {}".format(y.shape))
+        if verbose:print("[_prepare_data_prediction] prepare X with shape {}".format(X.shape))
+        if verbose:print("[_prepare_data_prediction] prepare y with shape {}".format(y.shape))
         return X, y
 
 

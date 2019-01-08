@@ -224,7 +224,7 @@ class model():
         return None #training results
 
 
-    def rnn_predict(self, sess, dataset_list, target_stock, label, visualize=False):
+    def rnn_predict(self, sess, dataset_list, target_stock, label, visualize=False, verbose=False):
         """
         method for SINGLE STOCK predicting new data with rnn model
         from /stock-rnn/main.py
@@ -247,8 +247,8 @@ class model():
 
         for more info: help(data_model.StockDataSet.__init__)
         """
-        print("[main.py] START PREDICTION STAGE")
-        print("[main.y] target stock: "+target_stock)
+        if verbose:print("[main.py] START PREDICTION STAGE")
+        if verbose:print("[main.y] target stock: "+target_stock)
 
         # Merged test data of different stocks.
         merged_test_X = []
@@ -273,8 +273,8 @@ class model():
 
         #test_prediction are normalized prices (not returns)
 
-        print("[main.py] GOT PREDICTIONS OF SHAPE")
-        print(test_prediction.shape)
+        if verbose:print("[main.py] GOT PREDICTIONS OF SHAPE")
+        if verbose:print(test_prediction.shape)
 
         if visualize:
             i = 9
@@ -316,7 +316,7 @@ class model():
         except:
             # asset is not mapped
             label = 0
-        print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
+        if verbose:print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
         dataset_list = [StockDataSet(
             target_stock,
             input_size=self.FLAGS.input_size,
@@ -359,7 +359,7 @@ class model():
         pred_values = []
         for code in pred_codes:
             tail_df, pred_df = X.iloc[:-len(market_obs_df)],market_obs_df
-            pred_asset = self.single_asset_predict(pred_df,tail_df,code)
+            pred_asset = self.single_asset_predict(pred_df,tail_df,code,verbose=False)
             pred_value = pred_asset[0][-1]
             pred_values.append(pred_value)
         
