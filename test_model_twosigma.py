@@ -11,7 +11,9 @@ class testcase(unittest.TestCase):
         DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
         import os
         self.news_train_df = None
-        self.market_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df_head.csv")).drop('Unnamed: 0', axis=1)
+        print("\n[test_model_twosigma.py/setUp] loading data..")
+        self.market_train_df_head = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df_head.csv")).drop('Unnamed: 0', axis=1)
+        self.market_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df.csv")).drop('Unnamed: 0', axis=1)
         self.market_train_df['time'] = pd.to_datetime(self.market_train_df['time'])
         
         self.market_cols = list(self.market_train_df.columns)
@@ -46,13 +48,30 @@ class testcase(unittest.TestCase):
 
     @unittest.skip("for later")
     def test_train(self):
-        m = model_twosigma.model('train_test_df_default_params')
+        """ OK on commit e6e63c6 """
+        m = model_twosigma.model('COMPETITION', num_steps=4, embed_size=4, max_epoch=50)
         self.assertTrue(m.model is None)
-        m.train([self.market_train_df, self.news_train_df], self.target, verbose=True, load=False)
+        m.train([self.market_train_df, self.news_train_df], self.target, verbose=True, load=True)
         try:import model_rnn
         except:pass
         self.assertEqual(type(m.model), model_rnn.LstmRNN)
         print("train test OK")
+
+    #@unittest.skip("for later")
+    def test_single_asset_predict(self):
+        m = model_twosigma.model('COMPETITION', num_steps=4, embed_size=4, max_epoch=50)
+        self.assertTrue(m.model is None)
+        m.train([self.market_train_df_head, self.news_train_df], self.target, verbose=True, load=True)
+        try:import model_rnn
+        except:pass
+        self.assertEqual(type(m.model), model_rnn.LstmRNN)
+
+        DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
+        print("[test_single_asset_predict] laoding data for testing")
+        mixed_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv"))
+        mixed_train_df = self.market_train_df
+        got = m.single_asset_predict(mixed_test_df, mixed_train_df, "AAPL.O")
+        assert len(got) > 0
 
     @unittest.skip("for later")
     def test_predict(self):

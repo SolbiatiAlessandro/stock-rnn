@@ -16,7 +16,8 @@ class StockDataSet(object):
                  normalized=True,
                  close_price_only=True,
                  read_from_twosigma=True,
-                 train_dataset=None):
+                 train_dataset=None,
+                 test_dataset=None):
         """
         Args:
             stock_sym: (str) filename, not used for two-sigma training
@@ -24,6 +25,8 @@ class StockDataSet(object):
             test_ratio: ==1 for testing, !=1 for training
             read_from_twosigma: (bool) toggle integration
             train_dataset: optional for speed up of loading data
+            test_dataset: used for prediction, in this case train_dataset
+                is used for computing lagged features
 
         NOTE:
 
@@ -64,10 +67,15 @@ class StockDataSet(object):
             # t0 = t1 - self.num_steps * self.input_size
             # for the single asset
 
-            DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
-            print("[dataLoader] loading two-sigma data")
-            mixed_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv"))
-            mixed_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df.csv"))
+            if test_dataset is None:
+                DATA_FOLDER = "~/Desktop/Coding/AI/two-sigma-kaggle/kernels/data"
+                print("[dataLoader] loading two-sigma data")
+                mixed_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv"))
+                mixed_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df.csv"))
+            else:
+                mixed_test_df = test_dataset
+                mixed_train_df = train_dataset
+
             tail_size = self.input_size * self.num_steps
             tail_time = mixed_train_df['time'].unique()[-tail_size-1]
             mixed_tail_df = mixed_train_df[mixed_train_df['time'] > tail_time]

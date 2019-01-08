@@ -153,7 +153,7 @@ class model():
         """
 
         start_time = time()
-        if verbose: print("Starting training for model {}, {}".format(self.name, ctime()))
+        if verbose: print("Starting training for model {}, {}\n".format(self.name, ctime()))
             
         time_reference = X[0]['time'] #time is dropped in preprocessing, but is needed later for metrics eval
         universe_reference = X[0]['universe']
@@ -164,40 +164,46 @@ class model():
         ####################
 
         with tf.Session(config=self.run_config) as sess:
-            train_dataset = X[0]
-
-            stock_data_list = []
-            assetCodes = train_dataset['assetCode'].unique().tolist()
-            for process, assetCode in enumerate(assetCodes):
-                if process % 500 == 0: print("[train] processing single asset data = "+str(process)+"/"+str(len(assetCodes)))
-
-                asset_train_dataset = train_dataset[train_dataset['assetCode'] == assetCode]
-                asset_train_dataset = pd.DataFrame({'Close':asset_train_dataset['close']}).reset_index(drop=True)
-
-                # if asset has too few datapoint don't insert or will break data process
-                if  self.FLAGS.num_steps * self.FLAGS.input_size + 1 < len(asset_train_dataset):
-                    stock_data_list.append(
-                        StockDataSet(assetCode,
-                                     input_size=self.FLAGS.input_size,
-                                     num_steps=self.FLAGS.num_steps,
-                                     test_ratio=0.05,
-                                     read_from_twosigma=True,
-                                     train_dataset = asset_train_dataset
-                                     )
-                        )
-
-            print("[train] data processing done TIME:",str(time() - start_time))
-
-            mapping = {}
-            for label, stockDataSet in enumerate(stock_data_list):
-                mapping[stockDataSet.stock_sym] = label
             import pickle as pk
-            pk.dump(mapping, open("temp_mapping","wb"))
-            # save map of asset codes
-            self.assetCode_mapping = mapping
+            try:
+                self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
+                print("[train] MAPPING FOUND, skip data processing and training")
+            except:
+                print("[train] NO MAPPING FOUND, starting data processing")
+                train_dataset = X[0]
 
-            print("[train] initialize rnn_model with stock_count: "+str(len(stock_data_list)))
-            self.FLAGS.stock_count = len(stock_data_list)
+                stock_data_list = []
+                assetCodes = train_dataset['assetCode'].unique().tolist()
+                for process, assetCode in enumerate(assetCodes):
+                    if process % 500 == 0: print("[train] processing single asset data = "+str(process)+"/"+str(len(assetCodes)))
+
+                    asset_train_dataset = train_dataset[train_dataset['assetCode'] == assetCode]
+                    asset_train_dataset = pd.DataFrame({'Close':asset_train_dataset['close']}).reset_index(drop=True)
+
+                    # if asset has too few datapoint don't insert or will break data process
+                    if  self.FLAGS.num_steps * self.FLAGS.input_size + 1 < len(asset_train_dataset):
+                        stock_data_list.append(
+                            StockDataSet(assetCode,
+                                         input_size=self.FLAGS.input_size,
+                                         num_steps=self.FLAGS.num_steps,
+                                         test_ratio=0.05,
+                                         read_from_twosigma=True,
+                                         train_dataset = asset_train_dataset
+                                         )
+                            )
+
+                print("[train] data processing done TIME:",str(time() - start_time))
+
+                mapping = {}
+                for label, stockDataSet in enumerate(stock_data_list):
+                    mapping[stockDataSet.stock_sym] = label
+                pk.dump(mapping, open("temp_mapping","wb"))
+                # save map of asset codes
+                self.assetCode_mapping = mapping
+
+            self.FLAGS.stock_count = len(self.assetCode_mapping)
+
+            print("[train] initialize rnn_model with stock_count: "+str(self.FLAGS.stock_count))
             self.model = LstmRNN(
                 sess,
                 stock_count =self.FLAGS.stock_count,
@@ -211,7 +217,8 @@ class model():
             if load:
                 try:
                     self._load()
-                    print("#"*30+"\n[WARNING] TRAINING SKIPPED, MODEL LOADED FROM MEMORY\n"+"[INFO] if you want to avoid skipping training, change model name"+"#"*30)
+                    print("#"*30+"\n[WARNING] TRAINING SKIPPED, MODEL LOADED FROM MEMORY\n"+"[INFO] if you want to avoid skipping training, change model name\n"+"#"*30)
+                    if verbose: print("\nFinished training for model {}, TIME {}".format(self.name, time()-start_time))
                     return
                 except:
                     print("Tried to load model but didn't find any")
@@ -223,11 +230,113 @@ class model():
 
         del X, train_dataset
 
-        if verbose: print("Finished training for model {}, TIME {}".format(self.name, time()-start_time))
+        if verbose: print("\nFinished training for model {}, TIME {}".format(self.name, time()-start_time))
 
         return None #training results
 
 
+    def rnn_predict(self, sess, dataset_list, target_stock, label, visualize=False):
+        """
+        method for SINGLE STOCK predicting new data with rnn model
+        from /stock-rnn/main.py
+        Args:
+            sess: (tensorflow.python.client.session.Session)
+            dataset_list: [(data_model.StockDataSet)] *NOTE
+            target_stock: (str)
+            label: (int)
+            visualize: (bool) plots predictions
+        returns:
+            test_predictions, test_loss
+
+        NOTE:
+            Arg dataset_list is generated as follows
+        dataset_list = [StockDataSet(
+            FILE_NAME,
+            input_size=FLAGS.input_size,
+            num_steps=FLAGS.num_steps,
+            test_ratio=1)]
+
+        for more info: help(data_model.StockDataSet.__init__)
+        """
+        print("[main.py] START PREDICTION STAGE")
+        print("[main.y] target stock: "+target_stock)
+
+        # Merged test data of different stocks.
+        merged_test_X = []
+        merged_test_y = []
+        merged_test_labels = []
+
+        for label_, d_ in enumerate(dataset_list):
+            merged_test_X += list(d_.test_X)
+            merged_test_y += list(d_.test_y)
+            merged_test_labels += [[label]] * len(d_.test_X)
+
+        test_data_feed = {
+            sess.graph.get_tensor_by_name('learning_rate:0'): 0.0,
+            sess.graph.get_tensor_by_name('keep_prob:0'): 1.0,
+            sess.graph.get_tensor_by_name('inputs:0'): merged_test_X,
+            sess.graph.get_tensor_by_name('targets:0'): merged_test_y,
+            sess.graph.get_tensor_by_name('stock_labels:0'): merged_test_labels,
+        }
+        prediction = sess.graph.get_tensor_by_name('add:0')
+        loss = sess.graph.get_tensor_by_name('loss_mse_test:0')
+        test_prediction, test_loss = sess.run([prediction, loss], test_data_feed)
+
+        #test_prediction are normalized prices (not returns)
+
+        print("[main.py] GOT PREDICTIONS OF SHAPE")
+        print(test_prediction.shape)
+
+        if visualize:
+            i = 9
+            print("printing labels[{}]".format(i))
+            pred = np.transpose(test_prediction)[i] * 5
+            real = np.transpose(merged_test_y)[i]
+            plt.plot(pred, label='pred')
+            plt.plot(real, label='real')
+            plt.legend()
+            plt.show()
+
+        return test_prediction, test_loss
+
+    def single_asset_predict(self, test_df, tail_df, target_stock, verbose=True):
+        """
+        predict values for single asset
+        Args:
+            test_df: mixed, used for prediction
+            tail_dF: mixed, used for lagged values
+            target_stock: (str) asset code to predict
+        Return:
+            test_prediction
+
+        self.model should already be trained or loaded  this poin
+        """
+        start_time = time()
+        if verbose: print("Starting single_asset_predict for model {}, {}".format(self.name, ctime()))
+
+        with tf.Session(config=self.run_config) as sess:
+            if not self.model:
+                raise Exception("[single_asset_pred] no model found! first run self.train")
+            if not self.assetCode_mapping:
+                import pickle as pk
+                self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
+
+            label = self.assetCode_mapping[target_stock]
+            print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
+            dataset_list = [StockDataSet(
+                target_stock,
+                input_size=self.FLAGS.input_size,
+                num_steps=self.FLAGS.num_steps,
+                test_ratio=1,
+                train_dataset = tail_df,
+                test_dataset = test_df
+                )]
+
+            test_prediction, test_loss = self.rnn_predict(sess, dataset_list, target_stock, label)
+
+            if verbose: print("Finished single_asset_predict for model {}, TIME {}".format(self.name, time()-start_time))
+            return test_prediction
+    
     def predict(self, X, verbose=False):
         """
         given a block of X features gives prediction for everyrow
