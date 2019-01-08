@@ -61,7 +61,7 @@ class testcase(unittest.TestCase):
     def test_single_asset_predict(self):
         m = model_twosigma.model('COMPETITION', num_steps=4, embed_size=4, max_epoch=50)
         self.assertTrue(m.model is None)
-        m.train([self.market_train_df_head, self.news_train_df], self.target, verbose=True, load=True)
+        m.train([self.market_train_df, self.news_train_df], self.target, verbose=True, load=True)
         try:import model_rnn
         except:pass
         self.assertEqual(type(m.model), model_rnn.LstmRNN)

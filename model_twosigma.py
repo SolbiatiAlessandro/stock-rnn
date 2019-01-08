@@ -163,69 +163,71 @@ class model():
         ## stock-rnn code ##
         ####################
 
-        with tf.Session(config=self.run_config) as sess:
-            import pickle as pk
+        self.sess = tf.Session(config=self.run_config)
+        self.sess.__enter__()
+        sess = self.sess
+        import pickle as pk
+        try:
+            self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
+            print("[train] MAPPING FOUND, skip data processing and training")
+        except:
+            print("[train] NO MAPPING FOUND, starting data processing")
+            train_dataset = X[0]
+
+            stock_data_list = []
+            assetCodes = train_dataset['assetCode'].unique().tolist()
+            for process, assetCode in enumerate(assetCodes):
+                if process % 500 == 0: print("[train] processing single asset data = "+str(process)+"/"+str(len(assetCodes)))
+
+                asset_train_dataset = train_dataset[train_dataset['assetCode'] == assetCode]
+                asset_train_dataset = pd.DataFrame({'Close':asset_train_dataset['close']}).reset_index(drop=True)
+
+                # if asset has too few datapoint don't insert or will break data process
+                if  self.FLAGS.num_steps * self.FLAGS.input_size + 1 < len(asset_train_dataset):
+                    stock_data_list.append(
+                        StockDataSet(assetCode,
+                                     input_size=self.FLAGS.input_size,
+                                     num_steps=self.FLAGS.num_steps,
+                                     test_ratio=0.05,
+                                     read_from_twosigma=True,
+                                     train_dataset = asset_train_dataset
+                                     )
+                        )
+
+            print("[train] data processing done TIME:",str(time() - start_time))
+
+            mapping = {}
+            for label, stockDataSet in enumerate(stock_data_list):
+                mapping[stockDataSet.stock_sym] = label
+            pk.dump(mapping, open("temp_mapping","wb"))
+            # save map of asset codes
+            self.assetCode_mapping = mapping
+
+        self.FLAGS.stock_count = len(self.assetCode_mapping)
+
+        print("[train] initialize rnn_model with stock_count: "+str(self.FLAGS.stock_count))
+        self.model = LstmRNN(
+            sess,
+            stock_count =self.FLAGS.stock_count,
+            lstm_size=self.FLAGS.lstm_size,
+            num_layers=self.FLAGS.num_layers,
+            num_steps=self.FLAGS.num_steps,
+            input_size=self.FLAGS.input_size,
+            embed_size=self.FLAGS.embed_size,
+        )
+
+        if load:
             try:
-                self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
-                print("[train] MAPPING FOUND, skip data processing and training")
+                self._load()
+                print("#"*30+"\n[WARNING] TRAINING SKIPPED, MODEL LOADED FROM MEMORY\n"+"[INFO] if you want to avoid skipping training, change model name\n"+"#"*30)
+                if verbose: print("\nFinished training for model {}, TIME {}".format(self.name, time()-start_time))
+                return
             except:
-                print("[train] NO MAPPING FOUND, starting data processing")
-                train_dataset = X[0]
+                print("Tried to load model but didn't find any")
+                pass
 
-                stock_data_list = []
-                assetCodes = train_dataset['assetCode'].unique().tolist()
-                for process, assetCode in enumerate(assetCodes):
-                    if process % 500 == 0: print("[train] processing single asset data = "+str(process)+"/"+str(len(assetCodes)))
-
-                    asset_train_dataset = train_dataset[train_dataset['assetCode'] == assetCode]
-                    asset_train_dataset = pd.DataFrame({'Close':asset_train_dataset['close']}).reset_index(drop=True)
-
-                    # if asset has too few datapoint don't insert or will break data process
-                    if  self.FLAGS.num_steps * self.FLAGS.input_size + 1 < len(asset_train_dataset):
-                        stock_data_list.append(
-                            StockDataSet(assetCode,
-                                         input_size=self.FLAGS.input_size,
-                                         num_steps=self.FLAGS.num_steps,
-                                         test_ratio=0.05,
-                                         read_from_twosigma=True,
-                                         train_dataset = asset_train_dataset
-                                         )
-                            )
-
-                print("[train] data processing done TIME:",str(time() - start_time))
-
-                mapping = {}
-                for label, stockDataSet in enumerate(stock_data_list):
-                    mapping[stockDataSet.stock_sym] = label
-                pk.dump(mapping, open("temp_mapping","wb"))
-                # save map of asset codes
-                self.assetCode_mapping = mapping
-
-            self.FLAGS.stock_count = len(self.assetCode_mapping)
-
-            print("[train] initialize rnn_model with stock_count: "+str(self.FLAGS.stock_count))
-            self.model = LstmRNN(
-                sess,
-                stock_count =self.FLAGS.stock_count,
-                lstm_size=self.FLAGS.lstm_size,
-                num_layers=self.FLAGS.num_layers,
-                num_steps=self.FLAGS.num_steps,
-                input_size=self.FLAGS.input_size,
-                embed_size=self.FLAGS.embed_size,
-            )
-
-            if load:
-                try:
-                    self._load()
-                    print("#"*30+"\n[WARNING] TRAINING SKIPPED, MODEL LOADED FROM MEMORY\n"+"[INFO] if you want to avoid skipping training, change model name\n"+"#"*30)
-                    if verbose: print("\nFinished training for model {}, TIME {}".format(self.name, time()-start_time))
-                    return
-                except:
-                    print("Tried to load model but didn't find any")
-                    pass
-
-            assert len(stock_data_list) > 0
-            self.model.train(stock_data_list, self.FLAGS)
+        assert len(stock_data_list) > 0
+        self.model.train(stock_data_list, self.FLAGS)
 
 
         del X, train_dataset
@@ -314,28 +316,28 @@ class model():
         start_time = time()
         if verbose: print("Starting single_asset_predict for model {}, {}".format(self.name, ctime()))
 
-        with tf.Session(config=self.run_config) as sess:
-            if not self.model:
-                raise Exception("[single_asset_pred] no model found! first run self.train")
-            if not self.assetCode_mapping:
-                import pickle as pk
-                self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
+        sess = self.sess
+        if not self.model:
+            raise Exception("[single_asset_pred] no model found! first run self.train")
+        if not self.assetCode_mapping:
+            import pickle as pk
+            self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
 
-            label = self.assetCode_mapping[target_stock]
-            print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
-            dataset_list = [StockDataSet(
-                target_stock,
-                input_size=self.FLAGS.input_size,
-                num_steps=self.FLAGS.num_steps,
-                test_ratio=1,
-                train_dataset = tail_df,
-                test_dataset = test_df
-                )]
+        label = self.assetCode_mapping[target_stock]
+        print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
+        dataset_list = [StockDataSet(
+            target_stock,
+            input_size=self.FLAGS.input_size,
+            num_steps=self.FLAGS.num_steps,
+            test_ratio=1,
+            train_dataset = tail_df,
+            test_dataset = test_df
+            )]
 
-            test_prediction, test_loss = self.rnn_predict(sess, dataset_list, target_stock, label)
+        test_prediction, test_loss = self.rnn_predict(sess, dataset_list, target_stock, label)
 
-            if verbose: print("Finished single_asset_predict for model {}, TIME {}".format(self.name, time()-start_time))
-            return test_prediction
+        if verbose: print("Finished single_asset_predict for model {}, TIME {}".format(self.name, time()-start_time))
+        return test_prediction
     
     def predict(self, X, verbose=False):
         """
