@@ -77,7 +77,15 @@ class StockDataSet(object):
                 mixed_train_df = train_dataset
 
             tail_size = self.input_size * self.num_steps
-            tail_time = mixed_train_df['time'].unique()[-tail_size-1]
+            if len(mixed_train_df['time'].unique())  < tail_size:
+                # this is not being triggered for some reason, should FIX
+                print("[dataLoader] WARNING: not enough tail data")
+                tail_time = 0
+            elif len(mixed_train_df['time'].unique()) > tail_size:
+                tail_time = mixed_train_df['time'].unique()[-tail_size-1]
+            else:
+                # perfect tail (coming from rolling predictions)
+                tail_time = 0
             mixed_tail_df = mixed_train_df[mixed_train_df['time'] > tail_time]
             del mixed_train_df
 
@@ -129,6 +137,20 @@ class StockDataSet(object):
         """
         # split into items of input_size
 
+        if len(tail_seq) < self.input_size * self.num_steps:
+            # this is a (temporary) way to handle asset without
+            print("[_prepare_data_prediction] WARNING: not enough data for tail, generating dull values")
+            dull_val = raw_seq[0]
+            try:
+                dull_val = tail_seq[0]
+            except:
+                print("#"*50+"\n\n[_prepare_data_prediction] CRITICAL WARNING, NO DATA TAIL FOUND! the model doesn't have any data to predict this asset")
+                pass
+            repeat_times = - len(tail_seq) + (self.input_size * self.num_steps)
+            #artificially setting tail_seq to minimum required len for prediction
+            tail_seq = np.array([dull_val] * repeat_times + tail_seq.tolist())
+            
+
         # predictions will start from this element of the concat df
         prediction_start = len(tail_seq)
         concat_seq = np.append(tail_seq, raw_seq)
@@ -143,18 +165,24 @@ class StockDataSet(object):
                 curr / concat_seq[i] - 1.0 for i, curr in enumerate(seq[1:])]
         # sequence starting in t is normalized on elemnt in t-1
         assert seq[0][1] == seq[1][0]
-        assert seq[1][1] != seq[2][0]
 
         range_val = len(seq) - self.num_steps 
         # reason and condition on tail_seq is that
         # len(tail_seq) + len(raw_seq) > self.num_steps * self.input_size
         assert range_val > 0
 
-        # there are N = len(raw_seq) - self.input_size, len(y) = N
-        y = np.array(seq[prediction_start :])
-        assert y.shape == (len(raw_seq) - self.input_size,
+        if len(raw_seq) != 1:
+            # case: prediction for testing
+            # there are N = len(raw_seq) - self.input_size, len(y) = N
+            y = np.array(seq[prediction_start :])
+            assert y.shape == (len(raw_seq) - self.input_size,
                 self.input_size)
-                
+        else:
+            # case: prediction for predicting
+            # there are N = len(raw_seq) = 1
+            y = np.array(seq[prediction_start - self.input_size:])
+            assert y.shape == (len(raw_seq),
+                self.input_size)
 
         # for every y[i] point add the last num_steps chunks
         # of length input_size to X[i]

@@ -175,7 +175,7 @@ class testcase(unittest.TestCase):
         # total_market_obs need to have last max_lag values
         # from market_train_df
 
-        start_time = self.market_train_df['time'].unique()[-max(n_lag)]
+        start_time = self.market_train_df['time'].unique()[-max(n_lag)-1]
         total_market_obs_df = [self.market_train_df[self.market_train_df['time'] > start_time]]
 
         for (market_obs_df, news_obs_df, predictions_template_df) in days[:2]:
@@ -183,11 +183,10 @@ class testcase(unittest.TestCase):
             t = time.time()
             #market_obs_df['time'] = market_obs_df['time'].dt.date
 
+            market_obs_df['time'] = market_obs_df['time'].apply(pd.to_datetime)
             total_market_obs_df.append(market_obs_df)
-            if len(total_market_obs_df)==1:
-                history_df = total_market_obs_df[0]
-            else:
-                history_df = pd.concat(total_market_obs_df[-(np.max(n_lag)+1):])
+            if len(market_obs_df) < 1000: continue #this is the first broken day in the simulation
+            history_df = pd.concat(total_market_obs_df[-(np.max(n_lag)+1):])
             
             confidence = model.predict_rolling([history_df, None], market_obs_df, verbose=True)      
                

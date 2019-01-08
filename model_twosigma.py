@@ -311,7 +311,11 @@ class model():
             import pickle as pk
             self.assetCode_mapping = pk.load(open("competition_mapping.pkl","rb"))
 
-        label = self.assetCode_mapping[target_stock]
+        try:
+            label = self.assetCode_mapping[target_stock]
+        except:
+            # asset is not mapped
+            label = 0
         print("[single_asset_pred] calling StockDataSet on {} {}".format(target_stock, label))
         dataset_list = [StockDataSet(
             target_stock,
@@ -350,9 +354,16 @@ class model():
         start_time = time()
         if verbose: print("Starting rolled prediction for model {}, {}".format(self.name, ctime()))
 
-        import pdb;pdb.set_trace()
-
-        y_test = None
+        X = historical_df[0].reset_index(drop=True)
+        pred_codes = market_obs_df['assetCode'].unique()
+        pred_values = []
+        for code in pred_codes:
+            tail_df, pred_df = X.iloc[:-len(market_obs_df)],market_obs_df
+            pred_asset = self.single_asset_predict(pred_df,tail_df,code)
+            pred_value = pred_asset[0][-1]
+            pred_values.append(pred_value)
+        
+        y_test = np.array(pred_values)
 
         if verbose: print("Finished rolled prediction for model {}, TIME {}".format(self.name, time()-start_time))
         return y_test
