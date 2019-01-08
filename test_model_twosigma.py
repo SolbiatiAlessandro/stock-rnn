@@ -161,7 +161,6 @@ class testcase(unittest.TestCase):
         except:pass
         self.assertEqual(type(model.model), model_rnn.LstmRNN)
 
-
         # the following is simulation code from submission kernel
 
         print("[test_predict_rolling] starting rolling simulation")
@@ -172,12 +171,15 @@ class testcase(unittest.TestCase):
         prediction_time = 0
         n_lag=[40] # num_steps * input_size = 40
         packaging_time = 0
-        total_market_obs_df = []
+
+        # total_market_obs need to have last max_lag values
+        # from market_train_df
+
+        start_time = self.market_train_df['time'].unique()[-max(n_lag)]
+        total_market_obs_df = [self.market_train_df[self.market_train_df['time'] > start_time]]
+
         for (market_obs_df, news_obs_df, predictions_template_df) in days[:2]:
             n_days +=1
-            if (n_days%50==0):
-                pass
-                #print(n_days,end=' ')
             t = time.time()
             #market_obs_df['time'] = market_obs_df['time'].dt.date
 

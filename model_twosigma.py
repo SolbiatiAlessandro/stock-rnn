@@ -350,7 +350,6 @@ class model():
         start_time = time()
         if verbose: print("Starting rolled prediction for model {}, {}".format(self.name, ctime()))
 
-
         import pdb;pdb.set_trace()
 
         y_test = None
