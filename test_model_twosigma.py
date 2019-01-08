@@ -45,6 +45,7 @@ class testcase(unittest.TestCase):
         print("\n[test_model_twosigma.py/setUp] loading data..")
         self.market_train_df_head = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df_head.csv")).drop('Unnamed: 0', axis=1)
         self.market_train_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_train_df.csv")).drop('Unnamed: 0', axis=1)
+        self.market_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv")).drop('Unnamed: 0', axis=1)
         self.market_train_df['time'] = pd.to_datetime(self.market_train_df['time'])
         
         self.market_cols = list(self.market_train_df.columns)
@@ -88,8 +89,9 @@ class testcase(unittest.TestCase):
         self.assertEqual(type(m.model), model_rnn.LstmRNN)
         print("train test OK")
 
-    #@unittest.skip("for later")
+    @unittest.skip("for later")
     def test_single_asset_predict(self):
+        """working benchmark on b63e5298"""
         m = model_twosigma.model('COMPETITION', num_steps=4, embed_size=4, max_epoch=50)
         self.assertTrue(m.model is None)
         m.train([self.market_train_df, self.news_train_df], self.target, verbose=True, load=True)
@@ -118,7 +120,6 @@ class testcase(unittest.TestCase):
 
         print("SIGMA SCORE: "+str(score))
 
-
     @unittest.skip("for later")
     def test_predict(self):
         """FROM OLD test_model_lgbm_71"""
@@ -136,26 +137,40 @@ class testcase(unittest.TestCase):
         self.assertEqual(len(y_test), len(got))
         print("predictions test OK")
 
-    @unittest.skip("for later")
+    #@unittest.skip("for later")
     def test_predict_rolling(self):
-        """FROM OLD test_model_lgbm_71"""
         import pickle as pk
-        with open("pickle/rolling_predictions_dataset.pkl","rb") as f:
-            days = pk.load(f)
-        mins,maxs,rng = pk.load(open("pickle/normalizing.pkl","rb"))
-        model = model_twosigma.model('DecisionTree.model_twosigma')
-        model._load()
+        try:
+            days = pk.load(open("pickle/days.pkl","rb"))
+            print("[test_predict_rolling] loaded days from memory")
+        except:
+            days = []
+            market_test_df = self.market_test_df
+            print("[test_predict_rolling] generating days")
+            for date in market_test_df['time'].unique():
+                market_obs_df = market_test_df[market_test_df['time'] == date].drop(['returnsOpenNextMktres10','universe'],axis=1)
+                predictions_template_df = pd.DataFrame({'assetCode':market_test_df[market_test_df['time'] == date]['assetCode'],
+                                                                                    'confidenceValue':0.0})
+                days.append([market_obs_df,None,predictions_template_df])
+            pk.dump(days, open("pickle/days.pkl","wb"))
 
-        PREDICTIONS = pk.load(open("pickle/_ref_rolling_predictions.pkl","rb"))
+        model = model_twosigma.model('COMPETITION', num_steps=4, embed_size=4, max_epoch=50)
+        self.assertTrue(model.model is None)
+        model.train([self.market_train_df, self.news_train_df], self.target, verbose=True, load=True)
+        try:import model_rnn
+        except:pass
+        self.assertEqual(type(model.model), model_rnn.LstmRNN)
+
 
         # the following is simulation code from submission kernel
 
+        print("[test_predict_rolling] starting rolling simulation")
         import time
-        _COMPARE_PREDICTIONS = []
+        PREDICTIONS = []
         n_days = 0
         prep_time = 0
         prediction_time = 0
-        n_lag=[3,7,14]
+        n_lag=[40] # num_steps * input_size = 40
         packaging_time = 0
         total_market_obs_df = []
         for (market_obs_df, news_obs_df, predictions_template_df) in days[:2]:
@@ -171,16 +186,15 @@ class testcase(unittest.TestCase):
                 history_df = total_market_obs_df[0]
             else:
                 history_df = pd.concat(total_market_obs_df[-(np.max(n_lag)+1):])
-                
             
-            confidence = model.predict_rolling([history_df, None], market_obs_df, verbose=True, normalize=True, normalize_vals = [maxs,mins])      
+            confidence = model.predict_rolling([history_df, None], market_obs_df, verbose=True)      
                
             preds = pd.DataFrame({'assetCode':market_obs_df['assetCode'],'confidence':confidence})
             predictions_template_df = predictions_template_df.merge(preds,how='left').drop('confidenceValue',axis=1).fillna(0).rename(columns={'confidence':'confidenceValue'})
-            _COMPARE_PREDICTIONS.append(predictions_template_df)
+            PREDICTIONS.append(predictions_template_df)
 
-        for i, ref in enumerate(_COMPARE_PREDICTIONS):
-            df = pd.DataFrame({'assetCode':PREDICTIONS[i]['assetCode'],'ref':PREDICTIONS[i]['confidenceValue'],'compare':_COMPARE_PREDICTIONS[i]['confidenceValue']})
+        for i, ref in enumerate(PREDICTIONS):
+            df = pd.DataFrame({'assetCode':PREDICTIONS[i]['assetCode'],'ref':PREDICTIONS[i]['confidenceValue'],'compare':PREDICTIONS[i]['confidenceValue']})
             try:
                 self.assertTrue(all(df.iloc[:,1] == df.iloc[:,2]))
             except:

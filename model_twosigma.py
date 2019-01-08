@@ -110,20 +110,7 @@ class model():
         Returns:
             complete_features: pandas.DataFrame
         """
-        start_time = time()
-        if verbose: print("Starting features generation for model {}, {}".format(self.name, ctime()))
-
-        complete_features = market_data.copy()
-
-        if 'returnsOpenNextMktres10' in complete_features.columns:
-            complete_features.drop(['returnsOpenNextMktres10'],axis=1,inplace=True)
-
-
-        # generate features here..
-
-
-        if verbose: print("Finished features generation for model {}, TIME {}".format(self.name, time()-start_time))
-        return complete_features
+        raise NotImplemented("inside other methods, didn't have time to refactor properly")
 
     def _generate_target(self, Y):
         """
@@ -349,17 +336,7 @@ class model():
         Returns:
             y: pandas.Series
         """
-        start_time = time()
-        if verbose: print("Starting prediction for model {}, {}".format(self.name, ctime()))
-
-        X_test = self._generate_features(X[0], X[1], verbose=verbose)
-        if verbose: print("X_test shape {}".format(X_test.shape))
-
-        # predict code here..
-        y_test = []
-
-        if verbose: print("Finished prediction for model {}, TIME {}".format(self.name, time()-start_time))
-        return y_test
+        raise NotImplemented("batch predict not implemented for model_twosigma.py")
 
     def predict_rolling(self, historical_df, market_obs_df, verbose=False):
         """
@@ -373,12 +350,8 @@ class model():
         start_time = time()
         if verbose: print("Starting rolled prediction for model {}, {}".format(self.name, ctime()))
 
-        X_test = self._generate_features(historical_df[0], historical_df[1], verbose=verbose, normalize=normalize, normalize_vals=normalize_vals, output_len=len(market_obs_df))
-        X_test.reset_index(drop=True,inplace=True)
-        if verbose: print("X_test shape {}".format(X_test.shape))
 
-        # prediction code here..
-
+        import pdb;pdb.set_trace()
 
         y_test = None
 
