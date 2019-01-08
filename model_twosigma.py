@@ -312,6 +312,7 @@ class model():
             test_prediction
 
         self.model should already be trained or loaded  this poin
+        self.sess should be an already initilaized tf.session with called .__enter__()
         """
         start_time = time()
         if verbose: print("Starting single_asset_predict for model {}, {}".format(self.name, ctime()))

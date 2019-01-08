@@ -4,6 +4,37 @@ import pandas as pd
 import numpy as np
 import os
 
+def binary_score(target_data, test_prediction, target_stock):
+    """
+    evaluates and store a simple binary score 
+    for model predictions
+
+    Args:
+        target_data: (data_model.StockDataSet)
+        test_predictions: (numpy.ndarray)
+           shape (len_prediction, FLAGS.input_size)
+        target_stock: (str) for name printing
+    return:
+        binary_score: (float)
+    """
+    binary_score = 0
+    for i in range(len(target_data.test_X)):
+        last_close = target_data.test_X[i][-1][-1]
+        #  _X[i][-1][-1], first [-1] is for the last 10 days, second [-1] is for the last day of last 10 days
+        real_next10 = target_data.test_y[i][-1]
+        pred_next10 = test_prediction[i][-1]
+
+        binary = int(((pred_next10 - last_close) * (real_next10 - last_close)) >= 0)
+        # are pred and real in the same direction?
+        binary_score += binary
+    from operator import truediv
+    score1 = truediv(binary_score, len(target_data.test_X))
+    print("[main] PREDICTIONS: binary score on "+target_stock)
+    print(score1)
+    score_file = "./logs/stock_rnn_lstm128_step30_input10_embed3/scores/train_data"
+    print("[main] writing scores on "+score_file)
+    with open(score_file,'a') as sf:
+        sf.write(target_stock+" "+str(score1)+"\n")
 
 class testcase(unittest.TestCase):
 
@@ -70,8 +101,23 @@ class testcase(unittest.TestCase):
         print("[test_single_asset_predict] laoding data for testing")
         mixed_test_df = pd.read_csv(os.path.join(DATA_FOLDER, "market_test_df.csv"))
         mixed_train_df = self.market_train_df
-        got = m.single_asset_predict(mixed_test_df, mixed_train_df, "AAPL.O")
+        sym = "MSFT.O"
+        got = m.single_asset_predict(mixed_test_df, mixed_train_df, sym)
         assert len(got) > 0
+        assert got.shape[1]==10
+
+        from sigma_score import sigma_score
+        single = mixed_test_df[mixed_test_df['assetCode'] == sym]
+        target = single['returnsOpenNextMktres10']
+        predictions = [batch[-1] for batch in got]
+
+        assert len(target) == len(predictions) + 10
+
+        x_t = target[:len(predictions)] * predictions
+        score = x_t.mean() / x_t.std()
+
+        print("SIGMA SCORE: "+str(score))
+
 
     @unittest.skip("for later")
     def test_predict(self):
