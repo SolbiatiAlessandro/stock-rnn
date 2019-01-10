@@ -2,6 +2,18 @@
 
 intergration for two sigma kaggle competition
 
+I forked this project to try to apply this RNN model to kaggle twosigma competition, at the end it didn't have such good performance so I didn't use it, but I fully integrated it with competition data and prediction pipeline. You can find these here.
+
+- the whole model was completely refactored inside 'model_twosigma.py'. You can check out 'test_model_twosigma.py' to see how it is used (and tested). The model is standardized and has some pretty general high level APIs to make predictions. (model.train, model.predict_rolling)
+
+- if you look in test_model_twosigma I am using for training local data coming from the kaggle competition (That you can download for free from kaggle). They are pretty heavy > 1GB. 
+
+- the model doesn't have exceptional scoring based on my refactoring. Predictions on unseen data on 10e6 datapoints has an accuracy of 56%, you can read more about prediction accuracy in the 1) git logs 2) explore_predictions.ipynb
+
+-----
+
+original repo
+
 
 ### Predict stock market prices using RNN
 
